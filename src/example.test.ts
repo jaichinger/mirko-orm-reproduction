@@ -118,7 +118,7 @@ test('Setting relationship to null should clear both fields of composite foreign
   const submission = await orm.em.findOneOrFail(
     FormSubmission,
     { orgId: 1, id: 20 },
-    // { populate: ['form'] }
+    { populate: ['form'] }
   );
 
   expect(submission.form).not.toBeNull();
