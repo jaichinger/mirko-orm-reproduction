@@ -111,7 +111,7 @@ test('Query through nested relationship', async () => {
     },
   );
 
-  expect(submissionFields).toHaveLength;
+  expect(submissionFields).toHaveLength(1);
 });
 
 test('Setting relationship to null should clear both fields of composite foreign key', async () => {
