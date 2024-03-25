@@ -1,10 +1,27 @@
-import { Entity, ManyToOne, MikroORM, Property, Ref } from '@mikro-orm/sqlite';
+import { Collection, Entity, ManyToOne, MikroORM, OneToMany, Property, Ref } from '@mikro-orm/postgresql';
 
-@Entity({ abstract: true })
-abstract class Common {
+@Entity()
+class Organisation {
   @Property({
     primary: true,
     type: 'integer',
+    fieldName: 'org_id'
+  })
+  id!: number;
+
+  @Property({ nullable: false })
+  name!: string;
+}
+
+@Entity({ abstract: true })
+abstract class Common {
+  @ManyToOne({
+    primary: true,
+    entity: () => Organisation,
+    nullable: false,
+    deleteRule: 'cascade',
+    mapToPk: true,
+    fieldName: 'org_id'
   })
   orgId!: number;
 
@@ -16,132 +33,69 @@ abstract class Common {
 }
 
 @Entity()
-class Form extends Common {
+class User extends Common {
   @Property({ nullable: false })
   name!: string;
-}
 
-@Entity()
-class FormSubmission extends Common {
-  @ManyToOne({
+  @OneToMany({
     entity: () => Form,
-    ref: true,
-    nullable: true,
+    mappedBy: 'owner',
+    orphanRemoval: true,
   })
-  form?: Ref<Form>;
+  forms = new Collection<Form>(this);
 }
 
 @Entity()
-class FormSubmissionField extends Common {
+class Form extends Common {
+  @Property()
+  name!: string;
+
   @ManyToOne({
-    entity: () => FormSubmission,
+    entity: () => User,
+    nullable: true,
     ref: true,
-    nullable: false,
   })
-  submission!: Ref<FormSubmission>;
-
-  @Property({ nullable: false })
-  value!: string;
+  owner?: Ref<User>;
 }
-
 
 let orm: MikroORM;
 
 beforeAll(async () => {
   orm = await MikroORM.init({
-    dbName: ':memory:',
-    entities: [Form, FormSubmission, FormSubmissionField],
+    dbName: 'test',
+    host: 'db',
+    password: 'password',
+    entities: [User, Form],
     debug: ['query', 'query-params'],
     allowGlobalContext: true, // only for testing
   });
-  await orm.schema.refreshDatabase();
-  await orm.em.flush();
+
+  await orm.schema.dropSchema();
 });
 
-beforeEach(async () => {
-  await orm.schema.refreshDatabase();
-
-  orm.em.clear();
-
-  const form1 = orm.em.create(Form, {
-    orgId: 1,
-    id: 10,
-    name: 'Form 1'
-  });
-
-  const submission = orm.em.create(FormSubmission, {
-    orgId: 1,
-    id: 20,
-    form: form1,
-  });
-
-  const submissionField = orm.em.create(FormSubmissionField, {
-    orgId: 1,
-    id: 30,
-    submission: submission,
-    value: 'James'
-  });
-
-  await orm.em.flush();
-})
-
 afterAll(async () => {
+  // await orm.schema.dropSchema();
   await orm.close(true);
 });
 
-test('Query through nested relationship', async () => {
-  const submissionField = await orm.em.findOneOrFail(
-    FormSubmissionField,
-    { id: 30 },
-    { populate: ['submission.form'] }
-  );
-
-  expect(submissionField.submission.$.form?.$.name).toBe('Form 1');
-  orm.em.clear();
-
-  const submissionFields = await orm.em.find(
-    FormSubmissionField,
-    {
-      submission: {
-        form: {
-          orgId: 1,
-          id: 10,
-        }
-      }
-    },
-  );
-
-  expect(submissionFields).toHaveLength(1);
+test('There should be schema changes starting from clean', async () => {
+  const generator = orm.getSchemaGenerator();
+  const beforeSql = await generator.getUpdateSchemaSQL({
+    safe: false,
+    dropTables: false,
+  });
+  expect(beforeSql).toBeTruthy();
+  await generator.updateSchema({
+    safe: false,
+    dropTables: false,
+  });
 });
 
-test('Setting relationship to null should clear both fields of composite foreign key', async () => {
-  const submission = await orm.em.findOneOrFail(
-    FormSubmission,
-    { orgId: 1, id: 20 },
-    { populate: ['form'] }
-  );
-
-  expect(submission.form).not.toBeNull();
-
-  submission.form = undefined;
-
-  await orm.em.flush()
-  orm.em.clear();
-
-  const submissionAfter = await orm.em.findOneOrFail(
-    FormSubmission,
-    { orgId: 1, id: 20 },
-    { populate: ['form'] }
-  );
-
-  expect(submissionAfter.form).toBeNull();
-
-  const qb = orm.em.createQueryBuilder(FormSubmission)
-    .where({ orgId: 1, id: 20 });
-
-  const results = await qb.execute();
-  const result = results[0];
-
-  expect(result.form_org_id).toBeNull();
-  expect(result.form_id).toBeNull();
-});
+test('No changes after schema updated.', async () => {
+  const generator = orm.getSchemaGenerator();
+  const afterSql = await generator.getUpdateSchemaSQL({
+    safe: false,
+    dropTables: false,
+  });
+  expect(afterSql).toBe("");
+})
