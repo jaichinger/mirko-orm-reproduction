@@ -1,4 +1,4 @@
-import { Collection, Entity, ManyToOne, MikroORM, OneToMany, PrimaryKey, PrimaryKeyProp, Property, ref, Ref } from '@mikro-orm/postgresql';
+import { Collection, Entity, ManyToOne, MikroORM, OneToMany, PrimaryKey, PrimaryKeyProp, Property, ref, Ref } from '@mikro-orm/sqlite';
 
 @Entity()
 class Organisation {
