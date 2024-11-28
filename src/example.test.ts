@@ -64,9 +64,7 @@ let orm: MikroORM;
 
 beforeAll(async () => {
   orm = await MikroORM.init({
-    dbName: 'test',
-    host: 'db',
-    password: 'password',
+    dbName: ':memory:',
     entities: [User, Form],
     debug: ['query', 'query-params'],
     allowGlobalContext: true, // only for testing
