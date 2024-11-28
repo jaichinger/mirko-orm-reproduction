@@ -88,8 +88,6 @@ afterAll(async () => {
 });
 
 test('Insert with relationship as ref() (fails)', async () => {
-  const user = 
-
   await orm.em.flush();
   
   const formInsert = orm.em.createQueryBuilder(Form).insert({
@@ -107,7 +105,7 @@ test('Insert with relationship as entity (fails)', async () => {
 
   const formInsert = orm.em.createQueryBuilder(Form).insert({
     org: ref(Organisation, 1),
-    id: 1,
+    id: 2,
     name: 'Test Form',
     owner: user,
   });
@@ -118,7 +116,7 @@ test('Insert with relationship as entity (fails)', async () => {
 test('Insert with relationship as PK array (works)', async () => {
   const formInsert = orm.em.createQueryBuilder(Form).insert({
     org: ref(Organisation, 1),
-    id: 1,
+    id: 3,
     name: 'Test Form',
     owner: [1, 1],
   });
