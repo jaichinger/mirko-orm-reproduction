@@ -1,4 +1,4 @@
-import { Collection, Entity, ManyToOne, MikroORM, OneToMany, Property, Ref } from '@mikro-orm/postgresql';
+import { Collection, Entity, ManyToOne, MikroORM, OneToMany, PrimaryKey, PrimaryKeyProp, Property, ref, Ref } from '@mikro-orm/postgresql';
 
 @Entity()
 class Organisation {
@@ -15,15 +15,17 @@ class Organisation {
 
 @Entity({ abstract: true })
 abstract class Common {
+  [PrimaryKeyProp]?: ['org', 'id'];
+
   @ManyToOne({
     primary: true,
     entity: () => Organisation,
     nullable: false,
+    fieldName: 'org_id',
     deleteRule: 'cascade',
-    mapToPk: true,
-    fieldName: 'org_id'
+    ref: true,
   })
-  orgId!: number;
+  org!: Ref<Organisation>;
 
   @Property({
     primary: true,
@@ -70,32 +72,55 @@ beforeAll(async () => {
     allowGlobalContext: true, // only for testing
   });
 
-  await orm.schema.dropSchema();
+  await orm.schema.refreshDatabase();
+
+  const org = orm.em.create(Organisation, { id: 1, name: 'Test Org' });
+  orm.em.create(User, {
+    org: org,
+    id: 1,
+    name: 'John Doe',
+  });
+  await orm.em.flush();
 });
 
 afterAll(async () => {
-  // await orm.schema.dropSchema();
   await orm.close(true);
 });
 
-test('There should be schema changes starting from clean', async () => {
-  const generator = orm.getSchemaGenerator();
-  const beforeSql = await generator.getUpdateSchemaSQL({
-    safe: false,
-    dropTables: false,
+test('Insert with relationship as ref() (fails)', async () => {
+  const user = 
+
+  await orm.em.flush();
+  
+  const formInsert = orm.em.createQueryBuilder(Form).insert({
+    org: ref(Organisation, 1),
+    id: 1,
+    name: 'Test Form',
+    owner: ref(User, [1, 1]),
   });
-  expect(beforeSql).toBeTruthy();
-  await generator.updateSchema({
-    safe: false,
-    dropTables: false,
-  });
+
+  await formInsert.execute();
 });
 
-test('No changes after schema updated.', async () => {
-  const generator = orm.getSchemaGenerator();
-  const afterSql = await generator.getUpdateSchemaSQL({
-    safe: false,
-    dropTables: false,
+test('Insert with relationship as entity (fails)', async () => {
+  const user = await orm.em.findOneOrFail(User, [1, 1]);
+
+  const formInsert = orm.em.createQueryBuilder(Form).insert({
+    org: ref(Organisation, 1),
+    id: 1,
+    name: 'Test Form',
+    owner: user,
   });
-  expect(afterSql).toBe("");
-})
+
+  await formInsert.execute();
+});
+
+test('Insert with relationship as PK array (works)', async () => {
+  const formInsert = orm.em.createQueryBuilder(Form).insert({
+    org: ref(Organisation, 1),
+    id: 1,
+    name: 'Test Form',
+    owner: [1, 1],
+  });
+  await formInsert.execute();
+});
